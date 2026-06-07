@@ -9,6 +9,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const bots = {}; 
 const attackIntervals = {};
+const attackConfigs = {}; 
 const clients = []; 
 
 function sendLog(msg) {
@@ -26,7 +27,6 @@ app.get('/api/stream', (req, res) => {
     req.on('close', () => clients.splice(clients.indexOf(res), 1));
 });
 
-// New endpoint: Get list of active bots
 app.get('/api/bots', (req, res) => {
     res.send(Object.keys(bots));
 });
@@ -49,6 +49,12 @@ function initBot(username, password) {
             setTimeout(() => {
                 bot.chat('/survival');
                 sendLog(`${username} executed /survival.`);
+                
+                if (attackConfigs[username] && attackConfigs[username].active) {
+                    sendLog(`Resuming attack loop for ${username}...`);
+                    delete attackIntervals[username]; 
+                    manageAttackInterval(username, attackConfigs[username].delay, 'start');
+                }
             }, 3000);
         }, 1000);
     });
@@ -95,26 +101,22 @@ function manageAttackInterval(username, delaySeconds, action) {
 
     if (action === 'start') {
         if (attackIntervals[username]) return { status: 'error', message: 'Already attacking.' };
+        attackConfigs[username] = { active: true, delay: delaySeconds };
         
         sendLog(`Starting sweep attack loop for ${username} (${delaySeconds}s)`);
-        
         const intervalId = setInterval(() => {
             const activeBot = bots[username];
             if (activeBot && activeBot.entity) {
-                
-                // Find nearest armor stand within 4 blocks
                 const target = activeBot.nearestEntity(entity => {
                     return entity.name === 'armor_stand' &&
                            entity.position.distanceTo(activeBot.entity.position) < 4;
                 });
 
                 if (target) {
-                    // Attack without lookAt to prevent head snapping
                     activeBot.attack(target); 
                 } else {
                     activeBot.swingArm('right');
                 }
-                
             } else {
                 clearInterval(intervalId);
                 delete attackIntervals[username];
@@ -127,6 +129,8 @@ function manageAttackInterval(username, delaySeconds, action) {
     
     if (action === 'stop') {
         if (!attackIntervals[username]) return { status: 'error', message: 'Not attacking.' };
+        if (attackConfigs[username]) attackConfigs[username].active = false;
+        
         clearInterval(attackIntervals[username]);
         delete attackIntervals[username];
         sendLog(`Stopped attack loop for ${username}.`);
@@ -147,6 +151,7 @@ app.post('/api/bots/add', (req, res) => {
 app.post('/api/bots/disconnect', (req, res) => {
     const { username } = req.body;
     if (bots[username]) {
+        if (attackConfigs[username]) attackConfigs[username].active = false;
         bots[username].quit();
         res.send({ status: 'success', message: `${username} disconnected.` });
     } else {
@@ -158,10 +163,30 @@ app.post('/api/bots/chat', (req, res) => {
     const { target, message } = req.body;
     if (target === 'all') {
         Object.values(bots).forEach(b => b.chat(message));
+        sendLog(`Broadcasted to all: ${message}`);
     } else if (bots[target]) {
         bots[target].chat(message);
+        sendLog(`${target} said: ${message}`);
+    } else {
+        return res.status(404).send({ status: 'error', message: 'Target bot offline.' });
     }
     res.send({ status: 'success', message: 'Message sent.' });
+});
+
+// New endpoint: Swap hotbar slot (0-8)
+app.post('/api/bots/hotbar', (req, res) => {
+    const { username, slot } = req.body;
+    const bot = bots[username];
+    if (!bot) return res.status(404).send({ error: 'Bot offline' });
+
+    const slotInt = parseInt(slot);
+    if (isNaN(slotInt) || slotInt < 0 || slotInt > 8) {
+        return res.status(400).send({ error: 'Invalid slot index.' });
+    }
+
+    bot.setQuickBarSlot(slotInt);
+    sendLog(`${username} changed active hotbar slot to ${slotInt}`);
+    res.send({ status: 'success', message: `Slot set to ${slotInt}` });
 });
 
 app.get('/api/bots/:username/inventory', (req, res) => {
