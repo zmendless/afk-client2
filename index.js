@@ -1,12 +1,16 @@
 const express = require('express');
 const mineflayer = require('mineflayer');
+const path = require('path'); // Added for file paths
 const app = express();
 
 app.use(express.json());
-app.use(express.static('public')); // Serves your HTML file
+
+// Serve index.html from the root folder
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 const bots = {}; 
-// Note: Integrate your database query here to load saved bots on startup
 
 app.post('/api/bots/add', (req, res) => {
     const { username, password } = req.body;
