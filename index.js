@@ -97,10 +97,11 @@ function manageAttackInterval(username, delaySeconds, action) {
         if (attackIntervals[username]) return { status: 'error', message: 'Already attacking.' };
         
         sendLog(`Starting attack loop for ${username} (${delaySeconds}s)`);
+        
         const intervalId = setInterval(() => {
             const activeBot = bots[username];
             if (activeBot && activeBot.entity) {
-                activeBot.attack();
+                    activeBot.swingArm('right'); // Swing blindly if nothing is there
             } else {
                 clearInterval(intervalId);
                 delete attackIntervals[username];
