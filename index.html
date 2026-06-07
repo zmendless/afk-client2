@@ -3,32 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TULPAR_OS</title>
+    <title>TULPAR_OS_V2</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
         :root {
-            --bg: #0a0a0a;
+            --bg: #050505;
             --fg: #33ff00;
             --muted: #1f521f;
             --glow: 0 0 5px rgba(51, 255, 0, 0.4);
             --scanline: rgba(0, 0, 0, 0.15);
         }
 
+        /* Custom text selection for that true terminal feel */
+        ::selection { background: var(--fg); color: var(--bg); text-shadow: none; }
+
         body {
             background-color: var(--bg);
             color: var(--fg);
             font-family: 'VT323', monospace;
-            font-size: 1.2rem;
+            font-size: 1.35rem; /* Increased base size */
             text-transform: uppercase;
             text-shadow: var(--glow);
-            margin: 0;
-            padding: 2rem;
-            line-height: 1.2;
+            margin: 0 auto;
+            max-width: 1600px; /* Expansive layout constraint */
+            padding: 3rem; /* More breathing room */
+            line-height: 1.3;
             overflow-x: hidden;
         }
 
-        /* CRT Scanline Overlay */
         body::after {
             content: " ";
             display: block;
@@ -42,35 +45,51 @@
 
         header {
             border-bottom: 2px dashed var(--muted);
-            padding-bottom: 1rem;
-            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            margin-bottom: 3rem;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
         }
 
-        h1 { margin: 0; font-size: 2rem; font-weight: normal; }
-        .status { color: var(--fg); opacity: 0.8; }
-        .blink { animation: blinker 1s linear infinite; }
+        .logo h1 { 
+            margin: 0; 
+            font-size: 1.8rem; 
+            font-weight: normal; 
+            letter-spacing: 2px;
+            line-height: 1;
+        }
+        
+        .sys-telemetry {
+            text-align: right;
+            font-size: 1.1rem;
+            color: var(--muted);
+        }
+        .sys-telemetry div { margin-bottom: 0.2rem; }
+        .sys-telemetry .active-status { color: var(--fg); font-weight: bold; }
+
+        .blink { animation: blinker 1s cubic-bezier(0.5, 0, 1, 1) infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); /* Larger panels */
+            gap: 2.5rem;
         }
 
         .panel {
             border: 1px solid var(--muted);
-            padding: 1.5rem;
+            padding: 2rem; /* Increased padding */
             position: relative;
+            background: rgba(0, 10, 0, 0.3);
+            box-shadow: inset 0 0 10px rgba(51, 255, 0, 0.05);
         }
 
         .panel::before {
             content: "+--- " attr(data-title) " ---+";
             position: absolute;
             top: -12px;
-            left: 10px;
+            left: 15px;
             background: var(--bg);
             padding: 0 5px;
             color: var(--fg);
@@ -78,22 +97,13 @@
 
         .row {
             display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
             align-items: center;
         }
 
-        .input-wrap {
-            display: flex;
-            align-items: center;
-            flex: 1;
-        }
-
-        .input-wrap::before {
-            content: ">";
-            margin-right: 0.5rem;
-            color: var(--fg);
-        }
+        .input-wrap { display: flex; align-items: center; flex: 1; }
+        .input-wrap::before { content: ">"; margin-right: 0.8rem; color: var(--fg); }
 
         input, select {
             background: transparent;
@@ -106,13 +116,22 @@
             outline: none;
             width: 100%;
             text-transform: uppercase;
-            padding: 2px 0;
+            padding: 4px 0;
+            transition: border-color 0.2s;
         }
 
         input:focus, select:focus { border-bottom-color: var(--fg); }
         option { background: var(--bg); color: var(--fg); }
 
-        .short-input { width: 50px; text-align: center; }
+        /* Remove Number Input Spinners */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] { -moz-appearance: textfield; }
+
+        .short-input { width: 70px; text-align: center; }
 
         button {
             background: transparent;
@@ -125,6 +144,7 @@
             transition: none;
             padding: 0;
             white-space: nowrap;
+            letter-spacing: 1px;
         }
 
         button::before { content: "[ "; color: var(--muted); }
@@ -132,93 +152,127 @@
         button:hover { background: var(--fg); color: var(--bg); text-shadow: none; }
         button:hover::before, button:hover::after { color: var(--bg); }
 
+        .divider {
+            color: var(--muted);
+            margin: 1rem 0;
+            text-align: center;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
         #console {
-            height: 200px;
+            height: 350px; /* Taller console */
             overflow-y: auto;
             border: 1px solid var(--muted);
-            padding: 1rem;
+            padding: 1.5rem;
             margin-top: 1rem;
-            font-size: 1rem;
-            text-transform: none; /* Keep logs readable */
+            font-size: 1.1rem;
+            text-transform: none;
+            background: rgba(0, 0, 0, 0.5);
         }
 
         ul { list-style: none; padding: 0; margin: 0; }
-        li { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--muted); padding: 0.2rem 0; }
+        li { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--muted); padding: 0.4rem 0; }
         
-        /* Scrollbar styling */
-        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar { width: 12px; }
         ::-webkit-scrollbar-track { background: var(--bg); border-left: 1px solid var(--muted); }
-        ::-webkit-scrollbar-thumb { background: var(--muted); }
+        ::-webkit-scrollbar-thumb { background: var(--muted); border: 1px solid var(--bg); }
         ::-webkit-scrollbar-thumb:hover { background: var(--fg); }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>TULPAR_OS<span class="blink">_</span></h1>
-        <div id="status" class="status">SYS.STATE: OFFLINE</div>
+        <div class="logo">
+            <h1>
++-+-+-+-+-+-+-+-+-+<br>
+|T|U|L|P|A|R|_|O|S|<br>
++-+-+-+-+-+-+-+-+-+<span class="blink">█</span>
+            </h1>
+        </div>
+        <div class="sys-telemetry">
+            <div id="clock">SYS.TIME: 00:00:00</div>
+            <div>MEM: [|||||||...] 48%</div>
+            <div>UPLINK: <span class="active-status">STABLE</span></div>
+            <div id="status" class="active-status">NET.STATE: OFFLINE</div>
+        </div>
     </header>
 
     <div class="grid">
-        <div class="panel" data-title="AUTH.SYS">
+        <div class="panel" data-title="AUTH.SYS // ROOT">
             <div class="row">
-                <div class="input-wrap"><input id="user" placeholder="USERNAME"></div>
-                <div class="input-wrap"><input id="pass" type="password" placeholder="PASSWORD"></div>
+                <div class="input-wrap"><input id="user" placeholder="TARGET_USERNAME" autocomplete="off"></div>
             </div>
-            <button onclick="addBot()" style="width: 100%;">EXECUTE_LOGIN</button>
+            <div class="row">
+                <div class="input-wrap"><input id="pass" type="password" placeholder="SECURITY_KEY"></div>
+            </div>
+            <div class="divider">================================</div>
+            <button onclick="addBot()" style="width: 100%;">EXECUTE_INJECTION</button>
         </div>
 
-        <div class="panel" data-title="UNIT.CTRL">
+        <div class="panel" data-title="UNIT.CTRL // NODE_OP">
             <div class="row">
                 <div class="input-wrap">
                     <select id="bot-select">
-                        <option value="" disabled selected>NO_UNITS_ACTIVE</option>
+                        <option value="" disabled selected>AWAITING_CONNECTION...</option>
                     </select>
                 </div>
-                <button onclick="action('disconnect')">KILL</button>
+                <button onclick="action('disconnect')">KILL_PROC</button>
             </div>
             
+            <div class="divider">--------------------------------</div>
+            
             <div class="row">
-                <span>DLY:</span>
+                <span>ATK.DLY(S):</span>
                 <input id="delay" class="short-input" type="number" step="0.5" min="0.5" value="2.0">
-                <button onclick="attack('start')">ATK.ON</button>
-                <button onclick="attack('stop')">ATK.OFF</button>
+                <button onclick="attack('start')" style="flex: 1;">INIT_ATK</button>
+                <button onclick="attack('stop')" style="flex: 1;">HALT_ATK</button>
             </div>
 
             <div class="row">
-                <span>SLT:</span>
-                <select id="hotbar-slot" class="short-input" style="width: auto;">
-                    <option value="0">1</option><option value="1">2</option><option value="2">3</option>
-                    <option value="3">4</option><option value="4">5</option><option value="5">6</option>
-                    <option value="6">7</option><option value="7">8</option><option value="8">9</option>
+                <span>INV.SLOT:</span>
+                <select id="hotbar-slot" class="short-input">
+                    <option value="0">01</option><option value="1">02</option><option value="2">03</option>
+                    <option value="3">04</option><option value="4">05</option><option value="5">06</option>
+                    <option value="6">07</option><option value="7">08</option><option value="8">09</option>
                 </select>
-                <button onclick="swapHotbar()" style="flex: 1;">EQUIP_SLOT</button>
+                <button onclick="swapHotbar()" style="flex: 1;">MOUNT_EQUIPMENT</button>
             </div>
 
-            <button onclick="checkInventory()" style="width: 100%; margin-top: 1rem;">SCAN_INVENTORY</button>
+            <div class="divider">--------------------------------</div>
+            <button onclick="checkInventory()" style="width: 100%;">SCAN_CARGO_HOLD</button>
             <div id="invResult" style="margin-top: 1rem;"></div>
         </div>
 
-        <div class="panel" data-title="COMM.LINK">
+        <div class="panel" data-title="COMM.LINK // TX_RX">
             <div class="row">
                 <div class="input-wrap">
                     <select id="chat-target-select">
-                        <option value="all">BROADCAST_ALL</option>
+                        <option value="all">BROADCAST_TO_ALL_NODES</option>
                     </select>
                 </div>
             </div>
             <div class="row">
-                <div class="input-wrap"><input id="msg" placeholder="PAYLOAD"></div>
-                <button onclick="sendChat()">TX</button>
+                <div class="input-wrap"><input id="msg" placeholder="ENTER_PAYLOAD_STRING" autocomplete="off"></div>
             </div>
+            <button onclick="sendChat()" style="width: 100%;">TRANSMIT_PACKET</button>
         </div>
     </div>
 
-    <div class="panel" data-title="TERM.OUT" style="margin-top: 2rem;">
-        <div id="console"></div>
+    <div class="panel" data-title="SYS.LOGS // STDOUT" style="margin-top: 2.5rem;">
+        <div id="console">
+            <div style="opacity: 0.5;">[INIT] Boot sequence complete.</div>
+            <div style="opacity: 0.5;">[INIT] Listening for socket events...</div>
+        </div>
     </div>
 
     <script>
+        // Real-time System Clock
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('clock').innerText = `SYS.TIME: ${now.toLocaleTimeString('en-US', { hour12: false })}`;
+        }, 1000);
+
         const evtSource = new EventSource('/api/stream');
         const cons = document.getElementById('console');
         evtSource.onmessage = (e) => {
@@ -226,7 +280,7 @@
             cons.scrollTop = cons.scrollHeight;
         };
 
-        const setStatus = (msg) => document.getElementById('status').innerText = `SYS.STATE: ${msg}`;
+        const setStatus = (msg) => document.getElementById('status').innerText = `NET.STATE: ${msg}`;
 
         async function req(endpoint, data) {
             const res = await fetch(endpoint, {
@@ -250,20 +304,20 @@
             const lastChatVal = chatSelect.value;
 
             ctrlSelect.innerHTML = '';
-            chatSelect.innerHTML = '<option value="all">BROADCAST_ALL</option>';
+            chatSelect.innerHTML = '<option value="all">BROADCAST_TO_ALL_NODES</option>';
 
             if (bots.length === 0) {
-                ctrlSelect.innerHTML = '<option value="" disabled selected>NO_UNITS_ACTIVE</option>';
+                ctrlSelect.innerHTML = '<option value="" disabled selected>AWAITING_CONNECTION...</option>';
                 return;
             }
 
             bots.forEach(b => {
                 const opt1 = document.createElement('option');
-                opt1.value = b; opt1.innerText = b;
+                opt1.value = b; opt1.innerText = `NODE::${b}`;
                 ctrlSelect.appendChild(opt1);
 
                 const opt2 = document.createElement('option');
-                opt2.value = b; opt2.innerText = b;
+                opt2.value = b; opt2.innerText = `NODE::${b}`;
                 chatSelect.appendChild(opt2);
             });
 
@@ -315,14 +369,14 @@
             }
 
             if (data.length === 0) {
-                invContainer.innerHTML = '<div>DATA_NULL</div>';
+                invContainer.innerHTML = '<div style="text-align: center; opacity: 0.5;">[ CARGO_HOLD_EMPTY ]</div>';
                 return;
             }
 
             let html = '<ul>';
             data.forEach(item => {
-                const countStr = String(item.count).padStart(3, '.');
-                html += `<li><span>${item.name}</span><span>${countStr}</span></li>`;
+                const countStr = String(item.count).padStart(3, '0');
+                html += `<li><span>> ${item.name}</span><span>[x${countStr}]</span></li>`;
             });
             html += '</ul>';
             invContainer.innerHTML = html;
