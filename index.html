@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bot Manager</title>
+</head>
+<body>
+    <h3>Manage Bots</h3>
+    <input id="user" placeholder="Username">
+    <input id="pass" placeholder="Password">
+    <button onclick="addBot()">Connect</button>
+    <button onclick="disconnectBot()">Disconnect</button>
+
+    <h3>Chat</h3>
+    <input id="target" placeholder="Target (Username or 'all')">
+    <input id="msg" placeholder="Message">
+    <button onclick="sendChat()">Send Chat</button>
+
+    <h3>Inventory Check</h3>
+    <input id="invUser" placeholder="Bot Username">
+    <button onclick="checkInventory()">Refresh Inventory</button>
+    <pre id="invResult"></pre>
+
+    <script>
+        async function apiCall(endpoint, data) {
+            return fetch(endpoint, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+        }
+
+        function addBot() {
+            apiCall('/api/bots/add', {
+                username: document.getElementById('user').value,
+                password: document.getElementById('pass').value
+            });
+        }
+
+        function disconnectBot() {
+            apiCall('/api/bots/disconnect', {
+                username: document.getElementById('user').value
+            });
+        }
+
+        function sendChat() {
+            apiCall('/api/bots/chat', {
+                target: document.getElementById('target').value,
+                message: document.getElementById('msg').value
+            });
+        }
+
+        async function checkInventory() {
+            const user = document.getElementById('invUser').value;
+            const res = await fetch(`/api/bots/${user}/inventory`);
+            const data = await res.json();
+            document.getElementById('invResult').innerText = JSON.stringify(data, null, 2);
+        }
+    </script>
+</body>
+</html>
