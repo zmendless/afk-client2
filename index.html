@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tulpar Command</title>
+    <title>Command</title>
     <style>
         :root {
             --bg: #ffffff;
@@ -16,13 +16,13 @@
             :root {
                 --bg: #111111;
                 --fg: #ffffff;
-                --border: #333333;
-                --hover: #222222;
+                --border: #222222;
+                --hover: #1a1a1a;
             }
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: var(--bg);
             color: var(--fg);
             margin: 0;
@@ -38,10 +38,10 @@
             border-bottom: 1px solid var(--border);
         }
 
-        h1 { margin: 0; font-size: 1.2rem; font-weight: 500; }
-        h2 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 1rem 0; color: #888; }
+        h1 { margin: 0; font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+        h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 1rem 0; color: #888; font-weight: 500; }
         
-        .status { font-size: 0.85rem; color: #888; }
+        .status { font-size: 0.8rem; color: #888; }
 
         .grid {
             display: grid;
@@ -52,7 +52,7 @@
         .panel {
             border: 1px solid var(--border);
             padding: 1.5rem;
-            border-radius: 4px;
+            border-radius: 0px;
         }
 
         .row {
@@ -63,68 +63,68 @@
         }
 
         input, select, button {
-            padding: 0.5rem 0.75rem;
+            padding: 0.5rem;
             font-family: inherit;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             border: 1px solid var(--border);
             background: var(--bg);
             color: var(--fg);
-            border-radius: 2px;
+            border-radius: 0px;
             outline: none;
         }
 
         input:focus, select:focus { border-color: var(--fg); }
-
         input, select { flex: 1; }
-        input[type="number"] { max-width: 60px; }
+        
+        .short-input { max-width: 60px; text-align: center; }
 
         button {
             background: var(--fg);
             color: var(--bg);
             cursor: pointer;
             border: 1px solid var(--fg);
-            transition: all 0.2s;
+            transition: opacity 0.15s ease;
             white-space: nowrap;
         }
 
-        button:hover {
-            background: var(--bg);
-            color: var(--fg);
-        }
+        button:hover { opacity: 0.8; }
 
         .btn-outline {
             background: var(--bg);
             color: var(--fg);
+            border: 1px solid var(--border);
         }
 
         .btn-outline:hover {
             background: var(--hover);
+            border-color: var(--fg);
         }
 
         #console {
-            height: 300px;
+            height: 250px;
             overflow-y: auto;
             font-family: monospace;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: #888;
             padding: 1rem;
             background: var(--hover);
-            border-radius: 2px;
+            border: 1px solid var(--border);
         }
 
-        ul { list-style: none; padding: 0; margin: 0; font-size: 0.85rem; }
+        ul { list-style: none; padding: 0; margin: 0; font-size: 0.8rem; }
         li { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
+
     <header>
-        <h1>Tulpar Command</h1>
-        <div id="status" class="status">System Ready</div>
+        <h1>System Control</h1>
+        <div id="status" class="status">Offline</div>
     </header>
 
     <div class="grid">
         <div class="panel">
-            <h2>Add Bot</h2>
+            <h2>Authentication</h2>
             <div class="row">
                 <input id="user" placeholder="Username">
                 <input id="pass" type="password" placeholder="Password">
@@ -133,36 +133,57 @@
         </div>
 
         <div class="panel">
-            <h2>Active Bot Control</h2>
+            <h2>Bot Control</h2>
             <div class="row">
                 <select id="bot-select">
-                    <option value="" disabled selected>No bots online</option>
+                    <option value="" disabled selected>No active connections</option>
                 </select>
                 <button class="btn-outline" onclick="action('disconnect')">Disconnect</button>
             </div>
             
             <div class="row">
-                <span style="font-size: 0.85rem;">Delay (s):</span>
-                <input id="delay" type="number" step="0.5" min="0.5" value="2.0">
+                <span class="status">Delay:</span>
+                <input id="delay" class="short-input" type="number" step="0.5" min="0.5" value="2.0">
                 <button class="btn-outline" onclick="attack('start')">Attack</button>
                 <button class="btn-outline" onclick="attack('stop')">Stop</button>
             </div>
 
-            <button class="btn-outline" onclick="checkInventory()" style="width: 100%; margin-bottom: 1rem;">View Inventory</button>
-            <div id="invResult"></div>
+            <div class="row">
+                <span class="status">Slot:</span>
+                <select id="hotbar-slot" class="short-input">
+                    <option value="0">1</option>
+                    <option value="1">2</option>
+                    <option value="2">3</option>
+                    <option value="3">4</option>
+                    <option value="4">5</option>
+                    <option value="5">6</option>
+                    <option value="6">7</option>
+                    <option value="7">8</option>
+                    <option value="8">9</option>
+                </select>
+                <button class="btn-outline" onclick="swapHotbar()" style="flex: 1;">Equip Slot</button>
+            </div>
+
+            <button class="btn-outline" onclick="checkInventory()" style="width: 100%; margin-top: 0.5rem;">Refresh Inventory</button>
+            <div id="invResult" style="margin-top: 1rem;"></div>
         </div>
 
         <div class="panel">
-            <h2>Broadcast</h2>
+            <h2>Messaging</h2>
             <div class="row">
-                <input id="msg" placeholder="Message all bots">
-                <button class="btn-outline" onclick="broadcast()">Send</button>
+                <select id="chat-target-select">
+                    <option value="all">All Bots</option>
+                </select>
+            </div>
+            <div class="row">
+                <input id="msg" placeholder="Message content">
+                <button onclick="sendChat()">Send</button>
             </div>
         </div>
     </div>
 
     <div class="panel" style="margin-top: 2rem;">
-        <h2>Terminal</h2>
+        <h2>Terminal Log</h2>
         <div id="console"></div>
     </div>
 
@@ -184,37 +205,46 @@
             });
             const result = await res.json();
             setStatus(result.message || result.error);
-            updateBotList();
+            updateBotLists();
         }
 
-        async function updateBotList() {
+        async function updateBotLists() {
             const res = await fetch('/api/bots');
             const bots = await res.json();
-            const select = document.getElementById('bot-select');
-            const currentVal = select.value;
+            
+            const ctrlSelect = document.getElementById('bot-select');
+            const chatSelect = document.getElementById('chat-target-select');
+            
+            const lastCtrlVal = ctrlSelect.value;
+            const lastChatVal = chatSelect.value;
 
-            select.innerHTML = '';
+            ctrlSelect.innerHTML = '';
+            chatSelect.innerHTML = '<option value="all">All Bots</option>';
+
             if (bots.length === 0) {
-                select.innerHTML = '<option value="" disabled selected>No bots online</option>';
+                ctrlSelect.innerHTML = '<option value="" disabled selected>No active connections</option>';
                 return;
             }
 
             bots.forEach(b => {
-                const opt = document.createElement('option');
-                opt.value = b;
-                opt.innerText = b;
-                select.appendChild(opt);
+                const opt1 = document.createElement('option');
+                opt1.value = b; opt1.innerText = b;
+                ctrlSelect.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = b; opt2.innerText = b;
+                chatSelect.appendChild(opt2);
             });
 
-            if (bots.includes(currentVal)) select.value = currentVal;
+            if (bots.includes(lastCtrlVal)) ctrlSelect.value = lastCtrlVal;
+            if (lastChatVal === 'all' || bots.includes(lastChatVal)) chatSelect.value = lastChatVal;
         }
 
-        setInterval(updateBotList, 3000); // Auto-refresh dropdown
+        setInterval(updateBotLists, 3000);
 
         function addBot() {
             req('/api/bots/add', { username: user.value, password: pass.value });
-            user.value = '';
-            pass.value = '';
+            user.value = ''; pass.value = '';
         }
 
         function action(type) {
@@ -228,8 +258,15 @@
             if (bot) req(`/api/bots/attack/${state}`, { username: bot, delay });
         }
 
-        function broadcast() {
-            req('/api/bots/chat', { target: 'all', message: msg.value });
+        function swapHotbar() {
+            const bot = document.getElementById('bot-select').value;
+            const slot = document.getElementById('hotbar-slot').value;
+            if (bot) req('/api/bots/hotbar', { username: bot, slot: slot });
+        }
+
+        function sendChat() {
+            const target = document.getElementById('chat-target-select').value;
+            req('/api/bots/chat', { target: target, message: msg.value });
             msg.value = '';
         }
 
@@ -247,13 +284,13 @@
             }
 
             if (data.length === 0) {
-                invContainer.innerHTML = '<p style="font-size:0.8rem;text-align:center;">Empty</p>';
+                invContainer.innerHTML = '<p style="font-size:0.75rem; text-align:center; color:#888;">Empty</p>';
                 return;
             }
 
             let html = '<ul>';
             data.forEach(item => {
-                html += `<li><span>${item.name}</span> <span>${item.count}</span></li>`;
+                html += `<li><span>${item.name}</span><span>${item.count}</span></li>`;
             });
             html += '</ul>';
             invContainer.innerHTML = html;
