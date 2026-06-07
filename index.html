@@ -3,187 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Command</title>
+    <title>TULPAR_OS</title>
     <style>
-        :root {
-            --bg: #ffffff;
-            --fg: #000000;
-            --border: #e5e5e5;
-            --hover: #f5f5f5;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #111111;
-                --fg: #ffffff;
-                --border: #222222;
-                --hover: #1a1a1a;
-            }
+        :root {
+            --bg: #0a0a0a;
+            --fg: #33ff00;
+            --muted: #1f521f;
+            --glow: 0 0 5px rgba(51, 255, 0, 0.4);
+            --scanline: rgba(0, 0, 0, 0.15);
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: var(--bg);
             color: var(--fg);
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            text-shadow: var(--glow);
             margin: 0;
             padding: 2rem;
+            line-height: 1.2;
+            overflow-x: hidden;
+        }
+
+        /* CRT Scanline Overlay */
+        body::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, var(--scanline) 50%);
+            background-size: 100% 4px;
+            z-index: 999;
+            pointer-events: none;
         }
 
         header {
+            border-bottom: 2px dashed var(--muted);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border);
+            align-items: flex-end;
         }
 
-        h1 { margin: 0; font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
-        h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 1rem 0; color: #888; font-weight: 500; }
-        
-        .status { font-size: 0.8rem; color: #888; }
+        h1 { margin: 0; font-size: 2rem; font-weight: normal; }
+        .status { color: var(--fg); opacity: 0.8; }
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 2rem;
         }
 
         .panel {
-            border: 1px solid var(--border);
+            border: 1px solid var(--muted);
             padding: 1.5rem;
-            border-radius: 0px;
+            position: relative;
+        }
+
+        .panel::before {
+            content: "+--- " attr(data-title) " ---+";
+            position: absolute;
+            top: -12px;
+            left: 10px;
+            background: var(--bg);
+            padding: 0 5px;
+            color: var(--fg);
         }
 
         .row {
             display: flex;
-            gap: 0.5rem;
+            gap: 1rem;
             margin-bottom: 1rem;
             align-items: center;
         }
 
-        input, select, button {
-            padding: 0.5rem;
-            font-family: inherit;
-            font-size: 0.85rem;
-            border: 1px solid var(--border);
-            background: var(--bg);
-            color: var(--fg);
-            border-radius: 0px;
-            outline: none;
+        .input-wrap {
+            display: flex;
+            align-items: center;
+            flex: 1;
         }
 
-        input:focus, select:focus { border-color: var(--fg); }
-        input, select { flex: 1; }
-        
-        .short-input { max-width: 60px; text-align: center; }
+        .input-wrap::before {
+            content: ">";
+            margin-right: 0.5rem;
+            color: var(--fg);
+        }
+
+        input, select {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--muted);
+            color: var(--fg);
+            font-family: inherit;
+            font-size: inherit;
+            text-shadow: inherit;
+            outline: none;
+            width: 100%;
+            text-transform: uppercase;
+            padding: 2px 0;
+        }
+
+        input:focus, select:focus { border-bottom-color: var(--fg); }
+        option { background: var(--bg); color: var(--fg); }
+
+        .short-input { width: 50px; text-align: center; }
 
         button {
-            background: var(--fg);
-            color: var(--bg);
+            background: transparent;
+            border: none;
+            color: var(--fg);
+            font-family: inherit;
+            font-size: inherit;
             cursor: pointer;
-            border: 1px solid var(--fg);
-            transition: opacity 0.15s ease;
+            text-shadow: inherit;
+            transition: none;
+            padding: 0;
             white-space: nowrap;
         }
 
-        button:hover { opacity: 0.8; }
-
-        .btn-outline {
-            background: var(--bg);
-            color: var(--fg);
-            border: 1px solid var(--border);
-        }
-
-        .btn-outline:hover {
-            background: var(--hover);
-            border-color: var(--fg);
-        }
+        button::before { content: "[ "; color: var(--muted); }
+        button::after { content: " ]"; color: var(--muted); }
+        button:hover { background: var(--fg); color: var(--bg); text-shadow: none; }
+        button:hover::before, button:hover::after { color: var(--bg); }
 
         #console {
-            height: 250px;
+            height: 200px;
             overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.75rem;
-            color: #888;
+            border: 1px solid var(--muted);
             padding: 1rem;
-            background: var(--hover);
-            border: 1px solid var(--border);
+            margin-top: 1rem;
+            font-size: 1rem;
+            text-transform: none; /* Keep logs readable */
         }
 
-        ul { list-style: none; padding: 0; margin: 0; font-size: 0.8rem; }
-        li { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px solid var(--border); }
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--muted); padding: 0.2rem 0; }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: var(--bg); border-left: 1px solid var(--muted); }
+        ::-webkit-scrollbar-thumb { background: var(--muted); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--fg); }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>System Control</h1>
-        <div id="status" class="status">Offline</div>
+        <h1>TULPAR_OS<span class="blink">_</span></h1>
+        <div id="status" class="status">SYS.STATE: OFFLINE</div>
     </header>
 
     <div class="grid">
-        <div class="panel">
-            <h2>Authentication</h2>
+        <div class="panel" data-title="AUTH.SYS">
             <div class="row">
-                <input id="user" placeholder="Username">
-                <input id="pass" type="password" placeholder="Password">
+                <div class="input-wrap"><input id="user" placeholder="USERNAME"></div>
+                <div class="input-wrap"><input id="pass" type="password" placeholder="PASSWORD"></div>
             </div>
-            <button onclick="addBot()" style="width: 100%;">Connect</button>
+            <button onclick="addBot()" style="width: 100%;">EXECUTE_LOGIN</button>
         </div>
 
-        <div class="panel">
-            <h2>Bot Control</h2>
+        <div class="panel" data-title="UNIT.CTRL">
             <div class="row">
-                <select id="bot-select">
-                    <option value="" disabled selected>No active connections</option>
-                </select>
-                <button class="btn-outline" onclick="action('disconnect')">Disconnect</button>
+                <div class="input-wrap">
+                    <select id="bot-select">
+                        <option value="" disabled selected>NO_UNITS_ACTIVE</option>
+                    </select>
+                </div>
+                <button onclick="action('disconnect')">KILL</button>
             </div>
             
             <div class="row">
-                <span class="status">Delay:</span>
+                <span>DLY:</span>
                 <input id="delay" class="short-input" type="number" step="0.5" min="0.5" value="2.0">
-                <button class="btn-outline" onclick="attack('start')">Attack</button>
-                <button class="btn-outline" onclick="attack('stop')">Stop</button>
+                <button onclick="attack('start')">ATK.ON</button>
+                <button onclick="attack('stop')">ATK.OFF</button>
             </div>
 
             <div class="row">
-                <span class="status">Slot:</span>
-                <select id="hotbar-slot" class="short-input">
-                    <option value="0">1</option>
-                    <option value="1">2</option>
-                    <option value="2">3</option>
-                    <option value="3">4</option>
-                    <option value="4">5</option>
-                    <option value="5">6</option>
-                    <option value="6">7</option>
-                    <option value="7">8</option>
-                    <option value="8">9</option>
+                <span>SLT:</span>
+                <select id="hotbar-slot" class="short-input" style="width: auto;">
+                    <option value="0">1</option><option value="1">2</option><option value="2">3</option>
+                    <option value="3">4</option><option value="4">5</option><option value="5">6</option>
+                    <option value="6">7</option><option value="7">8</option><option value="8">9</option>
                 </select>
-                <button class="btn-outline" onclick="swapHotbar()" style="flex: 1;">Equip Slot</button>
+                <button onclick="swapHotbar()" style="flex: 1;">EQUIP_SLOT</button>
             </div>
 
-            <button class="btn-outline" onclick="checkInventory()" style="width: 100%; margin-top: 0.5rem;">Refresh Inventory</button>
+            <button onclick="checkInventory()" style="width: 100%; margin-top: 1rem;">SCAN_INVENTORY</button>
             <div id="invResult" style="margin-top: 1rem;"></div>
         </div>
 
-        <div class="panel">
-            <h2>Messaging</h2>
+        <div class="panel" data-title="COMM.LINK">
             <div class="row">
-                <select id="chat-target-select">
-                    <option value="all">All Bots</option>
-                </select>
+                <div class="input-wrap">
+                    <select id="chat-target-select">
+                        <option value="all">BROADCAST_ALL</option>
+                    </select>
+                </div>
             </div>
             <div class="row">
-                <input id="msg" placeholder="Message content">
-                <button onclick="sendChat()">Send</button>
+                <div class="input-wrap"><input id="msg" placeholder="PAYLOAD"></div>
+                <button onclick="sendChat()">TX</button>
             </div>
         </div>
     </div>
 
-    <div class="panel" style="margin-top: 2rem;">
-        <h2>Terminal Log</h2>
+    <div class="panel" data-title="TERM.OUT" style="margin-top: 2rem;">
         <div id="console"></div>
     </div>
 
@@ -195,7 +226,7 @@
             cons.scrollTop = cons.scrollHeight;
         };
 
-        const setStatus = (msg) => document.getElementById('status').innerText = msg;
+        const setStatus = (msg) => document.getElementById('status').innerText = `SYS.STATE: ${msg}`;
 
         async function req(endpoint, data) {
             const res = await fetch(endpoint, {
@@ -219,10 +250,10 @@
             const lastChatVal = chatSelect.value;
 
             ctrlSelect.innerHTML = '';
-            chatSelect.innerHTML = '<option value="all">All Bots</option>';
+            chatSelect.innerHTML = '<option value="all">BROADCAST_ALL</option>';
 
             if (bots.length === 0) {
-                ctrlSelect.innerHTML = '<option value="" disabled selected>No active connections</option>';
+                ctrlSelect.innerHTML = '<option value="" disabled selected>NO_UNITS_ACTIVE</option>';
                 return;
             }
 
@@ -279,18 +310,19 @@
             const invContainer = document.getElementById('invResult');
             
             if (data.error) {
-                invContainer.innerText = data.error;
+                invContainer.innerText = `[ERR] ${data.error}`;
                 return;
             }
 
             if (data.length === 0) {
-                invContainer.innerHTML = '<p style="font-size:0.75rem; text-align:center; color:#888;">Empty</p>';
+                invContainer.innerHTML = '<div>DATA_NULL</div>';
                 return;
             }
 
             let html = '<ul>';
             data.forEach(item => {
-                html += `<li><span>${item.name}</span><span>${item.count}</span></li>`;
+                const countStr = String(item.count).padStart(3, '.');
+                html += `<li><span>${item.name}</span><span>${countStr}</span></li>`;
             });
             html += '</ul>';
             invContainer.innerHTML = html;
