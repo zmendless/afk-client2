@@ -96,12 +96,25 @@ function manageAttackInterval(username, delaySeconds, action) {
     if (action === 'start') {
         if (attackIntervals[username]) return { status: 'error', message: 'Already attacking.' };
         
-        sendLog(`Starting attack loop for ${username} (${delaySeconds}s)`);
+        sendLog(`Starting sweep attack loop for ${username} (${delaySeconds}s)`);
         
         const intervalId = setInterval(() => {
             const activeBot = bots[username];
             if (activeBot && activeBot.entity) {
-                    activeBot.swingArm('right'); // Swing blindly if nothing is there
+                
+                // Find nearest armor stand within 4 blocks
+                const target = activeBot.nearestEntity(entity => {
+                    return entity.name === 'armor_stand' &&
+                           entity.position.distanceTo(activeBot.entity.position) < 4;
+                });
+
+                if (target) {
+                    // Attack without lookAt to prevent head snapping
+                    activeBot.attack(target); 
+                } else {
+                    activeBot.swingArm('right');
+                }
+                
             } else {
                 clearInterval(intervalId);
                 delete attackIntervals[username];
