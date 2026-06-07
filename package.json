@@ -1,11 +1,16 @@
 {
-  "name": "afk-bot",
+  "name": "tulpar-bot-manager",
   "version": "1.0.0",
+  "description": "Mineflayer bot manager app with Express GUI",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "mineflayer": "^4.0.0"
+    "express": "^4.19.2",
+    "mineflayer": "^4.20.0"
+  },
+  "engines": {
+    "node": ">=18.x"
   }
 }
