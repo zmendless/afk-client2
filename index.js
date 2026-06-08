@@ -159,6 +159,32 @@ app.post('/api/bots/disconnect', (req, res) => {
     }
 });
 
+app.post('/api/bots/drop', async (req, res) => {
+    const { username } = req.body;
+    const bot = bots[username];
+    if (!bot) return res.status(404).send({ error: 'Bot offline.' });
+
+    const items = bot.inventory.items();
+    if (items.length === 0) {
+        return res.send({ status: 'success', message: 'CARGO_ALREADY_EMPTY' });
+    }
+
+    // Send immediate response so the UI doesn't hang
+    res.send({ status: 'success', message: 'JETTISON_SEQUENCE_STARTED' });
+    sendLog(`${username} initiating cargo jettison...`);
+
+    // Drop items sequentially
+    for (const item of items) {
+        try {
+            await bot.tossStack(item);
+            await bot.waitForTicks(2); // Wait ~100ms between drops
+        } catch (err) {
+            sendLog(`[ERR] ${username} drop failed: ${err.message}`);
+        }
+    }
+    sendLog(`${username} jettison complete.`);
+});
+
 app.post('/api/bots/chat', (req, res) => {
     const { target, message } = req.body;
     if (target === 'all') {
