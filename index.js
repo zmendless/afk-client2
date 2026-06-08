@@ -4,7 +4,6 @@ const path = require('path');
 const app = express();
 
 app.use(express.json());
-
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const bots = {}; 
@@ -27,20 +26,24 @@ app.get('/api/stream', (req, res) => {
     req.on('close', () => clients.splice(clients.indexOf(res), 1));
 });
 
+// Returns original casing for the UI dropdown
 app.get('/api/bots', (req, res) => {
-    res.send(Object.keys(bots));
+    res.send(Object.values(bots).map(b => b.originalName));
 });
 
 function initBot(username, password) {
-    if (bots[username]) return null;
+    const botId = username.toLowerCase(); // Internal tracking ID
+    if (bots[botId]) return null;
 
     sendLog(`Starting bot: ${username}`);
     const bot = mineflayer.createBot({
         host: 'play.tulparmc.com',
         port: 25565,
-        username: username,
+        username: username, // Uses exact casing for login
         version: '1.19.4'
     });
+
+    bot.originalName = username;
 
     bot.once('spawn', () => {
         sendLog(`${username} spawned. Executing login...`);
@@ -50,10 +53,10 @@ function initBot(username, password) {
                 bot.chat('/survival');
                 sendLog(`${username} executed /survival.`);
                 
-                if (attackConfigs[username] && attackConfigs[username].active) {
+                if (attackConfigs[botId] && attackConfigs[botId].active) {
                     sendLog(`Resuming attack loop for ${username}...`);
-                    delete attackIntervals[username]; 
-                    manageAttackInterval(username, attackConfigs[username].delay, 'start');
+                    delete attackIntervals[botId]; 
+                    manageAttackInterval(botId, attackConfigs[botId].delay, 'start');
                 }
             }, 3000);
         }, 1000);
@@ -61,175 +64,169 @@ function initBot(username, password) {
 
     bot.on('kicked', reason => {
         sendLog(`${username} kicked: ${reason}`);
-        handleConnectionLoss(username, password);
+        handleConnectionLoss(username, password, botId);
     });
     
     bot.on('error', err => {
         sendLog(`${username} error: ${err.message}`);
-        handleConnectionLoss(username, password);
+        handleConnectionLoss(username, password, botId);
     });
     
     bot.on('end', () => {
         sendLog(`${username} disconnected.`);
-        delete bots[username];
-        if (attackIntervals[username]) {
-            clearInterval(attackIntervals[username]);
-            delete attackIntervals[username];
+        delete bots[botId];
+        if (attackIntervals[botId]) {
+            clearInterval(attackIntervals[botId]);
+            delete attackIntervals[botId];
         }
     });
 
-    bots[username] = bot;
+    bots[botId] = bot;
     return bot;
 }
 
-function handleConnectionLoss(username, password) {
-    if (attackIntervals[username]) {
-        clearInterval(attackIntervals[username]);
-        delete attackIntervals[username];
+function handleConnectionLoss(username, password, botId) {
+    if (attackIntervals[botId]) {
+        clearInterval(attackIntervals[botId]);
+        delete attackIntervals[botId];
     }
-    delete bots[username];
+    delete bots[botId];
     sendLog(`${username} connection lost. Reconnecting in 30s...`);
     
     setTimeout(() => {
-        if (!bots[username]) initBot(username, password);
+        if (!bots[botId]) initBot(username, password);
     }, 30000); 
 }
 
-function manageAttackInterval(username, delaySeconds, action) {
-    const bot = bots[username];
+function manageAttackInterval(botId, delaySeconds, action) {
+    const bot = bots[botId];
     if (!bot) return { status: 'error', message: 'Bot offline.' };
+    const username = bot.originalName;
 
     if (action === 'start') {
-        if (attackIntervals[username]) return { status: 'error', message: 'Already attacking.' };
-        attackConfigs[username] = { active: true, delay: delaySeconds };
+        if (attackIntervals[botId]) return { status: 'error', message: 'Already attacking.' };
+        attackConfigs[botId] = { active: true, delay: delaySeconds };
         
         sendLog(`Starting sweep attack loop for ${username} (${delaySeconds}s)`);
         const intervalId = setInterval(() => {
-            const activeBot = bots[username];
+            const activeBot = bots[botId];
             if (activeBot && activeBot.entity) {
                 const target = activeBot.nearestEntity(entity => {
                     return entity.name === 'armor_stand' &&
                            entity.position.distanceTo(activeBot.entity.position) < 4;
                 });
 
-                if (target) {
-                    activeBot.attack(target); 
-                } else {
-                    activeBot.swingArm('right');
-                }
+                if (target) activeBot.attack(target); 
+                else activeBot.swingArm('right');
             } else {
                 clearInterval(intervalId);
-                delete attackIntervals[username];
+                delete attackIntervals[botId];
             }
         }, delaySeconds * 1000);
         
-        attackIntervals[username] = intervalId;
+        attackIntervals[botId] = intervalId;
         return { status: 'success', message: 'Attack started.' };
     } 
     
     if (action === 'stop') {
-        if (!attackIntervals[username]) return { status: 'error', message: 'Not attacking.' };
-        if (attackConfigs[username]) attackConfigs[username].active = false;
+        if (!attackIntervals[botId]) return { status: 'error', message: 'Not attacking.' };
+        if (attackConfigs[botId]) attackConfigs[botId].active = false;
         
-        clearInterval(attackIntervals[username]);
-        delete attackIntervals[username];
+        clearInterval(attackIntervals[botId]);
+        delete attackIntervals[botId];
         sendLog(`Stopped attack loop for ${username}.`);
         return { status: 'success', message: 'Attack stopped.' };
     }
     return { status: 'error', message: 'Invalid action.' };
 }
 
+// --- ALL ENDPOINTS NOW USE .toLowerCase() FOR LOOKUPS ---
+
 app.post('/api/bots/add', (req, res) => {
-    let { username, password } = req.body;
-    username = username.toLowerCase(); // Add this line
-    
+    const { username, password } = req.body;
     if (initBot(username, password)) {
         res.send({ status: 'success', message: `${username} initiated.` });
     } else {
-        res.status(400).send({ status: 'error', message: `Bot ${username} active.` });
+        res.status(400).send({ status: 'error', message: `Bot active.` });
     }
 });
 
 app.post('/api/bots/disconnect', (req, res) => {
-    const { username } = req.body;
-    if (bots[username]) {
-        if (attackConfigs[username]) attackConfigs[username].active = false;
-        bots[username].quit();
-        res.send({ status: 'success', message: `${username} disconnected.` });
+    const botId = req.body.username.toLowerCase();
+    if (bots[botId]) {
+        if (attackConfigs[botId]) attackConfigs[botId].active = false;
+        bots[botId].quit();
+        res.send({ status: 'success', message: `Disconnected.` });
     } else {
         res.status(404).send({ status: 'error', message: 'Bot not found.' });
     }
 });
 
-app.post('/api/bots/drop', async (req, res) => {
-    const { username } = req.body;
-    const bot = bots[username];
-    if (!bot) return res.status(404).send({ error: 'Bot offline.' });
-
-    const items = bot.inventory.items();
-    if (items.length === 0) {
-        return res.send({ status: 'success', message: 'CARGO_ALREADY_EMPTY' });
-    }
-
-    // Send immediate response so the UI doesn't hang
-    res.send({ status: 'success', message: 'JETTISON_SEQUENCE_STARTED' });
-    sendLog(`${username} initiating cargo jettison...`);
-
-    // Drop items sequentially
-    for (const item of items) {
-        try {
-            await bot.tossStack(item);
-            await bot.waitForTicks(2); // Wait ~100ms between drops
-        } catch (err) {
-            sendLog(`[ERR] ${username} drop failed: ${err.message}`);
-        }
-    }
-    sendLog(`${username} jettison complete.`);
-});
-
 app.post('/api/bots/chat', (req, res) => {
-    const { target, message } = req.body;
+    const target = req.body.target.toLowerCase();
+    const { message } = req.body;
+    
     if (target === 'all') {
         Object.values(bots).forEach(b => b.chat(message));
         sendLog(`Broadcasted to all: ${message}`);
     } else if (bots[target]) {
         bots[target].chat(message);
-        sendLog(`${target} said: ${message}`);
+        sendLog(`${bots[target].originalName} said: ${message}`);
     } else {
-        return res.status(404).send({ status: 'error', message: 'Target bot offline.' });
+        return res.status(404).send({ status: 'error', message: 'Target offline.' });
     }
     res.send({ status: 'success', message: 'Message sent.' });
 });
 
-// New endpoint: Swap hotbar slot (0-8)
 app.post('/api/bots/hotbar', (req, res) => {
-    const { username, slot } = req.body;
-    const bot = bots[username];
+    const botId = req.body.username.toLowerCase();
+    const bot = bots[botId];
     if (!bot) return res.status(404).send({ error: 'Bot offline' });
 
-    const slotInt = parseInt(slot);
-    if (isNaN(slotInt) || slotInt < 0 || slotInt > 8) {
-        return res.status(400).send({ error: 'Invalid slot index.' });
-    }
+    const slotInt = parseInt(req.body.slot);
+    if (isNaN(slotInt) || slotInt < 0 || slotInt > 8) return res.status(400).send({ error: 'Invalid slot' });
 
     bot.setQuickBarSlot(slotInt);
-    sendLog(`${username} changed active hotbar slot to ${slotInt}`);
-    res.send({ status: 'success', message: `Slot set to ${slotInt}` });
+    sendLog(`${bot.originalName} changed hotbar to ${slotInt}`);
+    res.send({ status: 'success', message: `Slot set` });
 });
 
 app.get('/api/bots/:username/inventory', (req, res) => {
-    const bot = bots[req.params.username];
+    const botId = req.params.username.toLowerCase();
+    const bot = bots[botId];
     if (!bot) return res.status(404).send({ error: 'Bot offline' });
     res.send(bot.inventory.items().map(item => ({ name: item.name, count: item.count })));
 });
 
+app.post('/api/bots/drop', async (req, res) => {
+    const botId = req.body.username.toLowerCase();
+    const bot = bots[botId];
+    if (!bot) return res.status(404).send({ error: 'Bot offline.' });
+
+    const items = bot.inventory.items();
+    if (items.length === 0) return res.send({ status: 'success', message: 'EMPTY' });
+
+    res.send({ status: 'success', message: 'DROPPING' });
+    sendLog(`${bot.originalName} jettisoning...`);
+
+    await bot.waitForTicks(10); 
+    for (const item of items) {
+        try {
+            await bot.tossStack(item);
+            await bot.waitForTicks(5); 
+        } catch (err) {
+            sendLog(`[ERR] Drop failed: ${err.message}`);
+        }
+    }
+});
+
 app.post('/api/bots/attack/start', (req, res) => {
-    const response = manageAttackInterval(req.body.username, req.body.delay, 'start');
+    const response = manageAttackInterval(req.body.username.toLowerCase(), req.body.delay, 'start');
     res.status(response.status === 'success' ? 200 : 400).send(response);
 });
 
 app.post('/api/bots/attack/stop', (req, res) => {
-    const response = manageAttackInterval(req.body.username, null, 'stop');
+    const response = manageAttackInterval(req.body.username.toLowerCase(), null, 'stop');
     res.status(response.status === 'success' ? 200 : 400).send(response);
 });
 
