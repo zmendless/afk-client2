@@ -140,7 +140,9 @@ function manageAttackInterval(username, delaySeconds, action) {
 }
 
 app.post('/api/bots/add', (req, res) => {
-    const { username, password } = req.body;
+    let { username, password } = req.body;
+    username = username.toLowerCase(); // Add this line
+    
     if (initBot(username, password)) {
         res.send({ status: 'success', message: `${username} initiated.` });
     } else {
