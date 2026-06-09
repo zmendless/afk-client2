@@ -9,6 +9,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 const bots = {}; 
 const attackIntervals = {};
 const attackConfigs = {}; 
+const survivalIntervals = {}; // New: Track survival intervals
 const clients = []; 
 
 function sendLog(msg) {
@@ -26,20 +27,19 @@ app.get('/api/stream', (req, res) => {
     req.on('close', () => clients.splice(clients.indexOf(res), 1));
 });
 
-// Returns original casing for the UI dropdown
 app.get('/api/bots', (req, res) => {
     res.send(Object.values(bots).map(b => b.originalName));
 });
 
 function initBot(username, password) {
-    const botId = username.toLowerCase(); // Internal tracking ID
+    const botId = username.toLowerCase();
     if (bots[botId]) return null;
 
     sendLog(`Starting bot: ${username}`);
     const bot = mineflayer.createBot({
         host: 'play.tulparmc.com',
         port: 25565,
-        username: username, // Uses exact casing for login
+        username: username,
         version: '1.19.4'
     });
 
@@ -53,6 +53,14 @@ function initBot(username, password) {
                 bot.chat('/survival');
                 sendLog(`${username} executed /survival.`);
                 
+                // NEW: Start sending /survival every 10 minutes (600,000 ms)
+                survivalIntervals[botId] = setInterval(() => {
+                    if (bots[botId]) {
+                        bots[botId].chat('/survival');
+                        sendLog(`${username} auto-executed /survival (10m loop).`);
+                    }
+                }, 600000);
+                
                 if (attackConfigs[botId] && attackConfigs[botId].active) {
                     sendLog(`Resuming attack loop for ${username}...`);
                     delete attackIntervals[botId]; 
@@ -60,6 +68,17 @@ function initBot(username, password) {
                 }
             }, 3000);
         }, 1000);
+    });
+
+    // NEW: Listen to public server chat and send to web terminal
+    bot.on('chat', (usernameSender, message) => {
+        if (usernameSender === bot.username) return; // Don't log own messages twice
+        sendLog(`[CHAT] <${usernameSender}> ${message}`);
+    });
+
+    // Handle private messages (whispers) just in case
+    bot.on('whisper', (usernameSender, message) => {
+        sendLog(`[WHISPER] from <${usernameSender}>: ${message}`);
     });
 
     bot.on('kicked', reason => {
@@ -74,23 +93,29 @@ function initBot(username, password) {
     
     bot.on('end', () => {
         sendLog(`${username} disconnected.`);
-        delete bots[botId];
-        if (attackIntervals[botId]) {
-            clearInterval(attackIntervals[botId]);
-            delete attackIntervals[botId];
-        }
+        cleanupBotState(botId);
     });
 
     bots[botId] = bot;
     return bot;
 }
 
-function handleConnectionLoss(username, password, botId) {
+// Helper function to cleanly delete a bot's running processes
+function cleanupBotState(botId) {
+    delete bots[botId];
+    
     if (attackIntervals[botId]) {
         clearInterval(attackIntervals[botId]);
         delete attackIntervals[botId];
     }
-    delete bots[botId];
+    if (survivalIntervals[botId]) {
+        clearInterval(survivalIntervals[botId]);
+        delete survivalIntervals[botId];
+    }
+}
+
+function handleConnectionLoss(username, password, botId) {
+    cleanupBotState(botId);
     sendLog(`${username} connection lost. Reconnecting in 30s...`);
     
     setTimeout(() => {
@@ -140,8 +165,6 @@ function manageAttackInterval(botId, delaySeconds, action) {
     return { status: 'error', message: 'Invalid action.' };
 }
 
-// --- ALL ENDPOINTS NOW USE .toLowerCase() FOR LOOKUPS ---
-
 app.post('/api/bots/add', (req, res) => {
     const { username, password } = req.body;
     if (initBot(username, password)) {
@@ -156,6 +179,7 @@ app.post('/api/bots/disconnect', (req, res) => {
     if (bots[botId]) {
         if (attackConfigs[botId]) attackConfigs[botId].active = false;
         bots[botId].quit();
+        // NOTE: cleanupBotState is automatically called via the 'end' event listener
         res.send({ status: 'success', message: `Disconnected.` });
     } else {
         res.status(404).send({ status: 'error', message: 'Bot not found.' });
@@ -168,10 +192,10 @@ app.post('/api/bots/chat', (req, res) => {
     
     if (target === 'all') {
         Object.values(bots).forEach(b => b.chat(message));
-        sendLog(`Broadcasted to all: ${message}`);
+        sendLog(`[OUTGOING BROADCAST]: ${message}`);
     } else if (bots[target]) {
         bots[target].chat(message);
-        sendLog(`${bots[target].originalName} said: ${message}`);
+        sendLog(`[OUTGOING] ${bots[target].originalName}: ${message}`);
     } else {
         return res.status(404).send({ status: 'error', message: 'Target offline.' });
     }
