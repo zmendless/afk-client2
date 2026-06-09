@@ -9,7 +9,8 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 const bots = {}; 
 const attackIntervals = {};
 const attackConfigs = {}; 
-const survivalIntervals = {}; // New: Track survival intervals
+const survivalIntervals = {}; 
+const reconnectTimeouts = {}; // NEW: Track pending reconnections
 const clients = []; 
 
 function sendLog(msg) {
@@ -27,12 +28,25 @@ app.get('/api/stream', (req, res) => {
     req.on('close', () => clients.splice(clients.indexOf(res), 1));
 });
 
+// Returns active bots AND bots pending reconnection for the UI dropdown
 app.get('/api/bots', (req, res) => {
-    res.send(Object.values(bots).map(b => b.originalName));
+    const active = Object.values(bots).map(b => b.originalName);
+    const pending = Object.keys(reconnectTimeouts).map(id => id.toUpperCase()); // Format for display
+    
+    // Combine and remove duplicates just in case
+    const allKnownBots = [...new Set([...active, ...pending])];
+    res.send(allKnownBots);
 });
 
 function initBot(username, password) {
     const botId = username.toLowerCase();
+    
+    // Clear any existing reconnect timeouts if we are manually starting
+    if (reconnectTimeouts[botId]) {
+        clearTimeout(reconnectTimeouts[botId]);
+        delete reconnectTimeouts[botId];
+    }
+
     if (bots[botId]) return null;
 
     sendLog(`Starting bot: ${username}`);
@@ -44,6 +58,7 @@ function initBot(username, password) {
     });
 
     bot.originalName = username;
+    bot.loginPassword = password; // Save password to instance for easy re-access
 
     bot.once('spawn', () => {
         sendLog(`${username} spawned. Executing login...`);
@@ -53,7 +68,6 @@ function initBot(username, password) {
                 bot.chat('/survival');
                 sendLog(`${username} executed /survival.`);
                 
-                // NEW: Start sending /survival every 10 minutes (600,000 ms)
                 survivalIntervals[botId] = setInterval(() => {
                     if (bots[botId]) {
                         bots[botId].chat('/survival');
@@ -70,13 +84,11 @@ function initBot(username, password) {
         }, 1000);
     });
 
-    // NEW: Listen to public server chat and send to web terminal
     bot.on('chat', (usernameSender, message) => {
-        if (usernameSender === bot.username) return; // Don't log own messages twice
+        if (usernameSender === bot.username) return; 
         sendLog(`[CHAT] <${usernameSender}> ${message}`);
     });
 
-    // Handle private messages (whispers) just in case
     bot.on('whisper', (usernameSender, message) => {
         sendLog(`[WHISPER] from <${usernameSender}>: ${message}`);
     });
@@ -100,7 +112,6 @@ function initBot(username, password) {
     return bot;
 }
 
-// Helper function to cleanly delete a bot's running processes
 function cleanupBotState(botId) {
     delete bots[botId];
     
@@ -118,7 +129,9 @@ function handleConnectionLoss(username, password, botId) {
     cleanupBotState(botId);
     sendLog(`${username} connection lost. Reconnecting in 30s...`);
     
-    setTimeout(() => {
+    // Track the timeout so we can cancel it later
+    reconnectTimeouts[botId] = setTimeout(() => {
+        delete reconnectTimeouts[botId]; // Remove from pending list
         if (!bots[botId]) initBot(username, password);
     }, 30000); 
 }
@@ -174,15 +187,34 @@ app.post('/api/bots/add', (req, res) => {
     }
 });
 
+// UPDATED: Disconnect logic now kills pending reconnections too
 app.post('/api/bots/disconnect', (req, res) => {
     const botId = req.body.username.toLowerCase();
+    let actionTaken = false;
+
+    // 1. Cancel pending reconnection if it exists
+    if (reconnectTimeouts[botId]) {
+        clearTimeout(reconnectTimeouts[botId]);
+        delete reconnectTimeouts[botId];
+        sendLog(`[SYS] Cancelled pending reconnection for ${botId}`);
+        actionTaken = true;
+    }
+
+    // 2. Clear attack configs so it doesn't try to resume if manually reconnected later
+    if (attackConfigs[botId]) {
+        attackConfigs[botId].active = false;
+    }
+
+    // 3. Quit the active bot if it exists
     if (bots[botId]) {
-        if (attackConfigs[botId]) attackConfigs[botId].active = false;
         bots[botId].quit();
-        // NOTE: cleanupBotState is automatically called via the 'end' event listener
-        res.send({ status: 'success', message: `Disconnected.` });
+        actionTaken = true;
+    }
+
+    if (actionTaken) {
+        res.send({ status: 'success', message: `KILLED_PROCESS: ${botId}` });
     } else {
-        res.status(404).send({ status: 'error', message: 'Bot not found.' });
+        res.status(404).send({ status: 'error', message: 'NO_PROCESS_FOUND' });
     }
 });
 
