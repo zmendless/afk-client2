@@ -10,7 +10,7 @@ const bots = {};
 const attackIntervals = {};
 const attackConfigs = {}; 
 const survivalIntervals = {}; 
-const reconnectTimeouts = {}; // NEW: Track pending reconnections
+const reconnectTimeouts = {}; 
 const clients = []; 
 
 function sendLog(msg) {
@@ -28,12 +28,9 @@ app.get('/api/stream', (req, res) => {
     req.on('close', () => clients.splice(clients.indexOf(res), 1));
 });
 
-// Returns active bots AND bots pending reconnection for the UI dropdown
 app.get('/api/bots', (req, res) => {
     const active = Object.values(bots).map(b => b.originalName);
-    const pending = Object.keys(reconnectTimeouts).map(id => id.toUpperCase()); // Format for display
-    
-    // Combine and remove duplicates just in case
+    const pending = Object.keys(reconnectTimeouts).map(id => id.toUpperCase());
     const allKnownBots = [...new Set([...active, ...pending])];
     res.send(allKnownBots);
 });
@@ -41,7 +38,6 @@ app.get('/api/bots', (req, res) => {
 function initBot(username, password) {
     const botId = username.toLowerCase();
     
-    // Clear any existing reconnect timeouts if we are manually starting
     if (reconnectTimeouts[botId]) {
         clearTimeout(reconnectTimeouts[botId]);
         delete reconnectTimeouts[botId];
@@ -58,7 +54,7 @@ function initBot(username, password) {
     });
 
     bot.originalName = username;
-    bot.loginPassword = password; // Save password to instance for easy re-access
+    bot.loginPassword = password; 
 
     bot.once('spawn', () => {
         sendLog(`${username} spawned. Executing login...`);
@@ -129,9 +125,8 @@ function handleConnectionLoss(username, password, botId) {
     cleanupBotState(botId);
     sendLog(`${username} connection lost. Reconnecting in 30s...`);
     
-    // Track the timeout so we can cancel it later
     reconnectTimeouts[botId] = setTimeout(() => {
-        delete reconnectTimeouts[botId]; // Remove from pending list
+        delete reconnectTimeouts[botId]; 
         if (!bots[botId]) initBot(username, password);
     }, 30000); 
 }
@@ -187,12 +182,35 @@ app.post('/api/bots/add', (req, res) => {
     }
 });
 
-// UPDATED: Disconnect logic now kills pending reconnections too
+// NEW: Batch add endpoint with 5-second staggered login
+app.post('/api/bots/batch-add', async (req, res) => {
+    const { accounts } = req.body;
+    if (!accounts || !Array.isArray(accounts)) {
+        return res.status(400).send({ status: 'error', message: 'Invalid payload.' });
+    }
+
+    res.send({ status: 'success', message: `BATCH_SEQ_STARTED (${accounts.length})` });
+    sendLog(`[SYS] Initiating batch login for ${accounts.length} units. Delay: 5s per unit.`);
+
+    for (let i = 0; i < accounts.length; i++) {
+        const acc = accounts[i];
+        if (acc.username && acc.password) {
+            initBot(acc.username, acc.password);
+            
+            // Wait 5 seconds before starting the next bot, unless it's the last one
+            if (i < accounts.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+        }
+    }
+    sendLog(`[SYS] Batch login sequence finished.`);
+});
+
+
 app.post('/api/bots/disconnect', (req, res) => {
     const botId = req.body.username.toLowerCase();
     let actionTaken = false;
 
-    // 1. Cancel pending reconnection if it exists
     if (reconnectTimeouts[botId]) {
         clearTimeout(reconnectTimeouts[botId]);
         delete reconnectTimeouts[botId];
@@ -200,12 +218,10 @@ app.post('/api/bots/disconnect', (req, res) => {
         actionTaken = true;
     }
 
-    // 2. Clear attack configs so it doesn't try to resume if manually reconnected later
     if (attackConfigs[botId]) {
         attackConfigs[botId].active = false;
     }
 
-    // 3. Quit the active bot if it exists
     if (bots[botId]) {
         bots[botId].quit();
         actionTaken = true;
