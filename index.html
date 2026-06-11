@@ -15,19 +15,18 @@
             --scanline: rgba(0, 0, 0, 0.15);
         }
 
-        /* Custom text selection for that true terminal feel */
         ::selection { background: var(--fg); color: var(--bg); text-shadow: none; }
 
         body {
             background-color: var(--bg);
             color: var(--fg);
             font-family: 'VT323', monospace;
-            font-size: 1.35rem; /* Increased base size */
+            font-size: 1.35rem; 
             text-transform: uppercase;
             text-shadow: var(--glow);
             margin: 0 auto;
-            max-width: 1600px; /* Expansive layout constraint */
-            padding: 3rem; /* More breathing room */
+            max-width: 1600px; 
+            padding: 3rem; 
             line-height: 1.3;
             overflow-x: hidden;
         }
@@ -73,13 +72,13 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); /* Larger panels */
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
             gap: 2.5rem;
         }
 
         .panel {
             border: 1px solid var(--muted);
-            padding: 2rem; /* Increased padding */
+            padding: 2rem; 
             position: relative;
             background: rgba(0, 10, 0, 0.3);
             box-shadow: inset 0 0 10px rgba(51, 255, 0, 0.05);
@@ -123,7 +122,6 @@
         input:focus, select:focus { border-bottom-color: var(--fg); }
         option { background: var(--bg); color: var(--fg); }
 
-        /* Remove Number Input Spinners */
         input[type="number"]::-webkit-inner-spin-button,
         input[type="number"]::-webkit-outer-spin-button {
             -webkit-appearance: none;
@@ -161,7 +159,7 @@
         }
 
         #console {
-            height: 350px; /* Taller console */
+            height: 350px; 
             overflow-y: auto;
             border: 1px solid var(--muted);
             padding: 1.5rem;
@@ -206,8 +204,12 @@
             <div class="row">
                 <div class="input-wrap"><input id="pass" type="password" placeholder="SECURITY_KEY"></div>
             </div>
-            <div class="divider">================================</div>
             <button onclick="addBot()" style="width: 100%;">EXECUTE_INJECTION</button>
+            
+            <div class="divider">================================</div>
+            <div style="text-align: center; margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--muted);">FORMAT: USERNAME PASSWORD (TXT)</div>
+            <input type="file" id="batch-file" accept=".txt" style="display: none;" onchange="handleBatchUpload(event)">
+            <button onclick="document.getElementById('batch-file').click()" style="width: 100%; color: #ffb000;">LOAD_BATCH_FILE</button>
         </div>
 
         <div class="panel" data-title="UNIT.CTRL // NODE_OP">
@@ -268,7 +270,6 @@
     </div>
 
     <script>
-        // Real-time System Clock
         setInterval(() => {
             const now = new Date();
             document.getElementById('clock').innerText = `SYS.TIME: ${now.toLocaleTimeString('en-US', { hour12: false })}`;
@@ -331,6 +332,36 @@
         function addBot() {
             req('/api/bots/add', { username: user.value, password: pass.value });
             user.value = ''; pass.value = '';
+        }
+
+        // NEW: Handle reading the text file and pushing the data to the backend
+        function handleBatchUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                const accounts = [];
+
+                lines.forEach(line => {
+                    const parts = line.trim().split(/\s+/); // Splits by any whitespace
+                    if (parts.length >= 2) {
+                        accounts.push({ username: parts[0], password: parts[1] });
+                    }
+                });
+
+                if (accounts.length > 0) {
+                    req('/api/bots/batch-add', { accounts: accounts });
+                } else {
+                    setStatus("ERR: FILE_EMPTY_OR_INVALID");
+                }
+                
+                // Reset file input so the same file can be uploaded again if needed
+                event.target.value = ''; 
+            };
+            reader.readAsText(file);
         }
 
         function action(type) {
